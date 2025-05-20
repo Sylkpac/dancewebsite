@@ -1,0 +1,45 @@
+name: Deploy Website to EC2 # Defines the name of this GitHub Actions workflow
+
+on: # Specifies what triggers the workflow to run
+  push: # when new code is sent/pushed to the Githiub repository (aka any repository)
+    branches: # deploy to main project (known as the production branch) 
+      - main # Only run this if the push is to the 'main' branch (your production branch)
+    paths:
+      - '**.html' # Trigger only if HTML files change (anywhere in the project)
+      - '**.css' # Trigger only if CSS files change
+      - '**.js'  # Trigger only if JavaScript files change
+       # the ** means it will look in all folders and subfolders for these files
+
+jobs: # This starts the list of jobs/steps. Each job runs it's steps independently on its own virtual machine (VM).
+  deploy:
+    name: Deploy Files to EC2  # Display name of this job in the GitHub Actions UI
+    runs-on: ubuntu-latest # Run the job on the latest Ubuntu VM
+
+    steps: # List of step-by-step tasks in the 'deploy' job
+
+      - name: Checkout Code # name of the step
+        uses: actions/checkout@v3 # Step 1: This checks out (downloads) your GitHub repo code onto the VM (so we can access the website files). This is prebuilt GitHub Actions — like plug-and-play automation scripts created by the community or GitHub itself.
+
+      - name: Copy files to EC2 # name of the step
+        uses: appleboy/scp-action@v0.1.7 # Step 2: Use SCP (Secure Copy) to send files from the GitHub VM to your EC2. This is prebuilt GitHub Actions — like plug-and-play automation scripts created by the community or GitHub itself.
+        with:
+          host: 34.239.144.236 # The public IPv4 address of your EC2 instance
+          username: ec2-user # The default username for Amazon Linux EC2 instances
+          key: ${{ secrets.AWS_SECRET_ACCESS_KEY }} # Uses your SSH private key stored in GitHub Secrets for secure access. Can be found in Github, the project's settings, under secrets and variables, in the actions tab.
+          source: "."  # Copy everything from the current GitHub repo directory. The SHH Secret is associated with your project repository, and not the entire github account.
+          target: "/tmp/website" # Paste the copied files into the /tmp/website folder on your EC2
+
+      - name: Deploy to Apache folder # name of the step
+        uses: appleboy/ssh-action@v0.1.7 # Step 3: Use SSH to connect and run commands on the EC2
+        with:
+          host: 34.239.144.236  # Connect to your EC2 instance again
+          username: ec2-user
+          key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          script: | # The following commands move your website files to the Apache server directory. # Remove all prior files ("clear cache") Move all HTML files. Move all CSS files. Move all JS files. # Print a confirmation message
+            sudo rm -rf /var/www/html/*.html
+            sudo rm -rf /var/www/html/*.css
+            sudo rm -rf /var/www/html/*.js
+            sudo cp -r /tmp/website/*.html /var/www/html/
+            sudo cp -r /tmp/website/*.css /var/www/html/
+            sudo cp -r /tmp/website/*.js /var/www/html/
+            echo "Website deployed at http://34.239.144.236"
